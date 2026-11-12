@@ -1,0 +1,8 @@
+# Dependencias para POS, NER, embeddings, clustering y proyección.
+# Los scripts 01_regex_contexto.py y 03_representaciones.py (TF-IDF)
+# también pueden ejecutarse con la biblioteca estándar de Python.
+spacy
+sentence-transformers
+scikit-learn
+umap-learn
+streamlit

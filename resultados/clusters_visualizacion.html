@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa de similitud de notas</title>
+  <style>
+    /* Variables y reglas globales mantienen colores y dimensiones coherentes. */
+    :root { color-scheme: light; --ink: #14251f; --muted: #60716a; --line: #d7dfd9; --paper: #f3f6f2; --white: #fff; --accent: #167d72; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: Georgia, "Times New Roman", serif; }
+    header { padding: 26px clamp(18px, 4vw, 56px) 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+    .eyebrow { margin: 0 0 8px; color: var(--accent); font: 700 11px/1.2 Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); font-weight: 500; line-height: 1.05; }
+    .summary { color: var(--muted); font: 14px/1.5 Arial, sans-serif; text-align: right; white-space: nowrap; }
+    main { padding: 22px clamp(18px, 4vw, 56px) 36px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
+    .chart-panel { min-width: 0; background: var(--white); border: 1px solid var(--line); }
+    .chart-heading { padding: 15px 18px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    h2 { margin: 0; font-size: 18px; font-weight: 500; }
+    .chart-heading span, .hint, .side-label { color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+    .plot-wrap { position: relative; padding: 0 10px 10px; }
+    canvas { display: block; width: 100%; height: 520px; touch-action: manipulation; }
+    .tooltip { position: absolute; z-index: 2; display: none; max-width: 290px; padding: 10px 12px; background: var(--ink); color: white; pointer-events: none; font: 12px/1.45 Arial, sans-serif; box-shadow: 0 4px 16px #14251f33; }
+    .tooltip strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    .hint { padding: 0 18px 14px; }
+    .terms-panel { padding: 15px 18px 18px; border-top: 1px solid var(--line); }
+    .terms-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .terms-heading h2 { font-size: 18px; }
+    .terms-select { width: auto; min-width: 135px; height: 34px; }
+    .terms-explanation { margin: 6px 0 13px; color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+    .term-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; }
+    .term-row { min-width: 0; }
+    .term-meta { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font: 12px/1.4 Arial, sans-serif; }
+    .term-meta strong { overflow-wrap: anywhere; font-size: 13px; }
+    .term-meta span { flex: 0 0 auto; color: var(--muted); font-size: 11px; text-align: right; }
+    .term-track { height: 5px; margin-top: 4px; background: #e7ece8; }
+    .term-track i { display: block; height: 100%; min-width: 2px; }
+    .term-empty { grid-column: 1 / -1; color: var(--muted); font: 13px/1.5 Arial, sans-serif; }
+    .glossary { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .glossary summary { color: var(--ink); cursor: pointer; font: 700 12px Arial, sans-serif; }
+    .glossary dl { display: grid; grid-template-columns: minmax(100px, 0.22fr) 1fr; gap: 8px 14px; margin: 12px 0 2px; font: 12px/1.5 Arial, sans-serif; }
+    .glossary dt { color: var(--accent); font-weight: 700; }
+    .glossary dd { margin: 0; color: var(--muted); }
+    aside { border-top: 3px solid var(--ink); }
+    .side-head { padding: 13px 0 9px; display: flex; justify-content: space-between; align-items: baseline; }
+    .side-head h2 { font-size: 18px; }
+    .legend { display: grid; gap: 4px; margin-bottom: 17px; }
+    .legend button { width: 100%; border: 0; background: transparent; padding: 8px 7px; color: var(--ink); display: flex; align-items: center; gap: 9px; text-align: left; cursor: pointer; font: 13px Arial, sans-serif; }
+    .legend button:hover, .legend button[aria-pressed="false"] { background: #e6ece7; }
+    .swatch { width: 11px; height: 11px; flex: 0 0 11px; border-radius: 50%; }
+    .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+    label { display: block; margin: 0 0 6px; font: 700 11px Arial, sans-serif; text-transform: uppercase; color: var(--muted); }
+    input { width: 100%; height: 38px; border: 1px solid #b9c5bd; border-radius: 0; padding: 0 10px; background: white; color: var(--ink); font: 14px Arial, sans-serif; }
+    input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .doc-list { margin-top: 9px; max-height: 310px; overflow: auto; border-top: 1px solid var(--line); }
+    .doc-list a { display: block; padding: 9px 4px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; font: 13px/1.35 Arial, sans-serif; }
+    .doc-list a:hover { color: var(--accent); }
+    .doc-list small { display: block; color: var(--muted); margin-top: 3px; font-size: 11px; }
+    .note { margin: 19px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+    /* Los puntos de quiebre apilan los paneles y reducen el gráfico en móvil. */
+    @media (max-width: 800px) { header { align-items: start; flex-direction: column; } .summary { text-align: left; white-space: normal; } .layout { grid-template-columns: 1fr; } canvas { height: 430px; } aside { border-top-width: 2px; } .doc-list { max-height: 240px; } }
+    @media (max-width: 560px) { .term-list { grid-template-columns: 1fr; } .term-meta span { font-size: 10px; } }
+    @media (max-width: 460px) { .chart-heading { align-items: start; flex-direction: column; gap: 3px; } .terms-heading { align-items: start; flex-direction: column; gap: 9px; } canvas { height: 350px; } }
+  </style>
+</head>
+<body>
+  <!-- El encabezado, el mapa y la columna lateral conforman la vista principal. -->
+  <header>
+    <div><p class="eyebrow">Exploración del corpus</p><h1>Mapa de similitud</h1></div>
+    <div class="summary" id="summary"></div>
+  </header>
+  <main>
+    <div class="layout">
+      <section class="chart-panel" aria-labelledby="map-title">
+        <div class="chart-heading"><h2 id="map-title">Proyección UMAP de los embeddings</h2><span>Un punto representa una nota</span></div>
+        <div class="plot-wrap" id="plot-wrap"><canvas id="plot" aria-label="Mapa de notas agrupadas por cluster"></canvas><div class="tooltip" id="tooltip"></div></div>
+        <div class="hint">Pasa sobre un punto para ver la nota. Los ejes muestran la proyección 2D; sus distancias son exploratorias.</div>
+        <section class="terms-panel" aria-labelledby="terms-title">
+          <div class="terms-heading"><h2 id="terms-title">Términos que distinguen al cluster</h2><select class="terms-select" id="term-cluster" aria-label="Cluster para analizar términos"></select></div>
+          <p class="terms-explanation">Contraste entre el TF-IDF medio normalizado del grupo y el resto. Solo se incluyen términos presentes en varias notas; la cuenta indica cuántas.</p>
+          <div class="term-list" id="term-list" aria-live="polite"></div>
+        </section>
+        <details class="glossary" open>
+          <summary>Glosario</summary>
+          <dl>
+            <dt>UMAP</dt><dd>Método que comprime los vectores de cada nota a dos coordenadas para dibujarlos. Ayuda a explorar similitudes; los ejes y sus distancias no son categorías ni una prueba de que los grupos sean correctos.</dd>
+            <dt>Embedding</dt><dd>Vector numérico que representa una nota y recoge relaciones de significado aprendidas por un modelo.</dd>
+            <dt>Cluster</dt><dd>Grupo de notas que el algoritmo reunió por la semejanza de sus embeddings. El número solo identifica el grupo; no le asigna un tema.</dd>
+            <dt>TF-IDF</dt><dd>Peso de una palabra que combina cuánto aparece en una nota con qué tan poco común es en el conjunto. Aquí se usa para describir diferencias entre grupos, no para formar estos clusters.</dd>
+            <dt>dif. pp</dt><dd>Diferencia en puntos porcentuales entre la proporción TF-IDF media del término dentro del cluster y la del resto. Un valor positivo indica que el término pesa más en ese cluster.</dd>
+            <dt>Prevalencia</dt><dd>En cuántas notas del cluster aparece el término, respecto al total de notas del grupo.</dd>
+          </dl>
+        </details>
+      </section>
+      <aside>
+        <div class="side-head"><h2>Grupos</h2><span class="side-label">Pulsa para filtrar</span></div>
+        <div class="legend" id="legend"></div>
+        <label for="search">Buscar nota</label>
+        <input id="search" type="search" placeholder="Título o identificador">
+        <div class="doc-list" id="doc-list"></div>
+        <p class="note">Los grupos se calcularon sobre embeddings en alta dimensión. Esta vista 2D ayuda a explorarlos, pero no asigna por sí sola un tema a cada cluster.</p>
+      </aside>
+    </div>
+  </main>
+  <script>
+    // Los marcadores se sustituyen con datos calculados en Python antes de
+    // guardar el HTML; enabled contiene los clusters visibles actualmente.
+    const points = [{"file": "IBNP2009010501.md", "title": "Hallan 2 cuerpos en fosa de Jalisco", "cluster": 2, "x": 17.00580406188965, "y": -3.9743354320526123}, {"file": "IBNP2009013101.md", "title": "Hallan narcofosas con 4 cuerpos en Uruapan", "cluster": 2, "x": 16.24635124206543, "y": -3.9676969051361084}, {"file": "IBNP2009031401.md", "title": "Hallan cuerpo de menor plagiado", "cluster": 0, "x": 15.008026123046875, "y": -1.9208730459213257}, {"file": "IBNP2009031502.md", "title": "Descubren en Ciudad Juárez una narcofosa", "cluster": 2, "x": 17.31957244873047, "y": -4.661541938781738}, {"file": "IBNP2009042401.md", "title": "Buscan con ADN cuerpo de experto antisecuestro", "cluster": 0, "x": 15.413801193237305, "y": -2.265939235687256}, {"file": "IBNP2009062802.md", "title": "Localizan 20 cuerpos en fosa clandestina", "cluster": 2, "x": 17.00352668762207, "y": -4.411672592163086}, {"file": "IBNP2009070402.md", "title": "Hallan cinco cadáveres en altar gigante en Zitácuaro", "cluster": 2, "x": 15.744952201843262, "y": -4.439352035522461}, {"file": "IBNP2009080301.md", "title": "Caen en Oaxaca 4 plagiarios del empresario italiano Conti", "cluster": 4, "x": 15.519412994384766, "y": -1.7322709560394287}, {"file": "IBNP2010060891.md", "title": "Corrigen en Taxco: son 55 cadáveres", "cluster": 2, "x": 16.44354820251465, "y": -2.7849323749542236}, {"file": "IBNP2010062090.md", "title": "Identifican cuerpos de narcofosa en QR", "cluster": 2, "x": 17.543302536010742, "y": -3.819392442703247}, {"file": "IBNP2010062189.md", "title": "Reportan fosa clandestina con 9 cuerpos en Durango", "cluster": 3, "x": 14.575119972229004, "y": -2.627202033996582}, {"file": "IBNP20100824114.md", "title": "Hay al menos siete cuerpos Narcominas en Pachuca", "cluster": 2, "x": 16.39474105834961, "y": -2.1904492378234863}, {"file": "IBNP2010090771.md", "title": "Descubren marinos narcofosa en Tamaulipas", "cluster": 2, "x": 17.304723739624023, "y": -3.1773617267608643}, {"file": "IBNP2010102651.md", "title": "Localizan cuatro cuerpos en fosa clandestina en Oaxaca", "cluster": 2, "x": 15.456300735473633, "y": -4.873006820678711}, {"file": "IBNP2010110429.md", "title": "Continúa búsqueda de restos humanos en Acapulco", "cluster": 1, "x": 15.704629898071289, "y": -2.975419521331787}, {"file": "IBNP2010110446.md", "title": "Hallan 18 cadáveres en narcofosa de Acapulco", "cluster": 1, "x": 16.42090606689453, "y": -3.3861095905303955}, {"file": "IBNP20101115107.md", "title": "Hallan cuerpos en otra fosa en Acapulco", "cluster": 1, "x": 15.602594375610352, "y": -3.783384084701538}, {"file": "IBNP20101116101.md", "title": "Cuerpos de Tunzingo no son de michoacanos", "cluster": 1, "x": 15.502823829650879, "y": -3.3435497283935547}, {"file": "IBNP2010121114.md", "title": "Localizan otro narcocementerio en Ascensión, Chihuahua", "cluster": 2, "x": 16.702373504638672, "y": -5.111881256103516}, {"file": "IBNP2010121207.md", "title": "Localizan otra narcofosa en Chihuahua", "cluster": 2, "x": 16.380718231201172, "y": -4.732840538024902}, {"file": "IBNP2010121212.md", "title": "Hallan cuatro cadáveres en cinco fosas clandestinas en Chihuahua", "cluster": 2, "x": 16.108318328857422, "y": -5.294681549072266}, {"file": "IBNP2011010701.md", "title": "Encuentran 7 cuerpos en cuatro fosas de Durango", "cluster": 3, "x": 14.655220985412598, "y": -3.85943341255188}, {"file": "IBNP2011010705.md", "title": "Localizan cuatro fosas clandestinas en Durango", "cluster": 3, "x": 14.722951889038086, "y": -4.255717754364014}, {"file": "IBNP2011012002.md", "title": "Hallan siete cadáveres en varios puntos de Durango", "cluster": 3, "x": 14.380041122436523, "y": -3.2663819789886475}];
+    const colors = {"0": "#d45c3f", "1": "#167d72", "2": "#c78c16", "3": "#4567a8", "4": "#8b5a9f"};
+    const clusterTerms = {"0": [{"term": "hombre", "score": 0.0049303555277906315, "prevalence": 2, "total": 2}, {"term": "sinaloa", "score": 0.0045333501338528145, "prevalence": 2, "total": 2}, {"term": "secuestrado", "score": 0.004104307685742283, "prevalence": 2, "total": 2}, {"term": "vehículo", "score": 0.003541408579584561, "prevalence": 2, "total": 2}, {"term": "california", "score": 0.0035388110959009658, "prevalence": 2, "total": 2}, {"term": "tijuana", "score": 0.003461607316440675, "prevalence": 2, "total": 2}, {"term": "automóvil", "score": 0.003069427940378241, "prevalence": 2, "total": 2}, {"term": "compañía", "score": 0.003069427940378241, "prevalence": 2, "total": 2}, {"term": "culiacán", "score": 0.003069427940378241, "prevalence": 2, "total": 2}, {"term": "guasave", "score": 0.003069427940378241, "prevalence": 2, "total": 2}], "1": [{"term": "michoacanos", "score": 0.0074972987233435685, "prevalence": 3, "total": 4}, {"term": "acapulco", "score": 0.0066636589633244986, "prevalence": 4, "total": 4}, {"term": "tunzingo", "score": 0.006259661019544525, "prevalence": 3, "total": 4}, {"term": "características", "score": 0.0053013622447298375, "prevalence": 2, "total": 4}, {"term": "físicas", "score": 0.0053013622447298375, "prevalence": 2, "total": 4}, {"term": "desaparecidos", "score": 0.005209275457274792, "prevalence": 3, "total": 4}, {"term": "señaló", "score": 0.003989334872765971, "prevalence": 2, "total": 4}, {"term": "falta", "score": 0.003919906430977833, "prevalence": 2, "total": 4}, {"term": "corresponden", "score": 0.0039041843316954287, "prevalence": 3, "total": 4}, {"term": "comunicado", "score": 0.0037206268091984364, "prevalence": 3, "total": 4}], "2": [{"term": "ascensión", "score": 0.003281409692356495, "prevalence": 4, "total": 13}, {"term": "anónima", "score": 0.002847801628842431, "prevalence": 7, "total": 13}, {"term": "notimex", "score": 0.0027176760311837895, "prevalence": 5, "total": 13}, {"term": "cinco", "score": 0.0025291369025344347, "prevalence": 8, "total": 13}, {"term": "chihuahua", "score": 0.0022833910791652838, "prevalence": 6, "total": 13}, {"term": "federales", "score": 0.0022756506724443803, "prevalence": 6, "total": 13}, {"term": "narcofosa", "score": 0.0022135059441438236, "prevalence": 8, "total": 13}, {"term": "norte", "score": 0.002185552621812337, "prevalence": 5, "total": 13}, {"term": "denuncia", "score": 0.002166386003204201, "prevalence": 5, "total": 13}, {"term": "peritos", "score": 0.0021325006834372173, "prevalence": 8, "total": 13}], "3": [{"term": "durango", "score": 0.007981424571333832, "prevalence": 4, "total": 4}, {"term": "lerdo", "score": 0.004113080500283226, "prevalence": 3, "total": 4}, {"term": "metro", "score": 0.0037935621613232337, "prevalence": 2, "total": 4}, {"term": "bala", "score": 0.003766620552739708, "prevalence": 4, "total": 4}, {"term": "masculino", "score": 0.0037544998556482377, "prevalence": 3, "total": 4}, {"term": "sexo", "score": 0.0037544998556482377, "prevalence": 3, "total": 4}, {"term": "olor", "score": 0.0034130654523218135, "prevalence": 2, "total": 4}, {"term": "terracería", "score": 0.0034130654523218135, "prevalence": 2, "total": 4}, {"term": "siete", "score": 0.003376075213309811, "prevalence": 3, "total": 4}, {"term": "impactos", "score": 0.0031526220700397404, "prevalence": 3, "total": 4}], "4": [{"term": "barbas", "score": 0.012434390463072197, "prevalence": 1, "total": 1}, {"term": "coello", "score": 0.012434390463072197, "prevalence": 1, "total": 1}, {"term": "conti", "score": 0.010935350064024409, "prevalence": 1, "total": 1}, {"term": "escondido", "score": 0.010935350064024409, "prevalence": 1, "total": 1}, {"term": "italiano", "score": 0.010935350064024409, "prevalence": 1, "total": 1}, {"term": "empresario", "score": 0.010874585836992851, "prevalence": 1, "total": 1}, {"term": "claudio", "score": 0.008822572843900405, "prevalence": 1, "total": 1}, {"term": "jefe", "score": 0.008822572843900405, "prevalence": 1, "total": 1}, {"term": "ocurrido", "score": 0.008822572843900405, "prevalence": 1, "total": 1}, {"term": "oaxaca", "score": 0.00820934381382805, "prevalence": 1, "total": 1}]};
+    const enabled = new Set(Object.keys(colors));
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+    const tooltip = document.getElementById("tooltip");
+    const search = document.getElementById("search");
+    const termCluster = document.getElementById("term-cluster");
+    let drawn = [];
+
+    // Construye el resumen, la leyenda de filtros y el selector de términos.
+    const counts = Object.fromEntries(Object.keys(colors).map((cluster) => [cluster, points.filter((p) => String(p.cluster) === cluster).length]));
+    document.getElementById("summary").textContent = `${points.length} notas · ${Object.keys(colors).length} clusters · BAAI/bge-m3`;
+    document.getElementById("legend").innerHTML = Object.keys(colors).map((cluster) =>
+      `<button type="button" data-cluster="${cluster}" aria-pressed="true"><i class="swatch" style="background:${colors[cluster]}"></i>Cluster ${cluster}<span class="count">${counts[cluster]} notas</span></button>`
+    ).join("");
+    termCluster.innerHTML = Object.keys(colors).map((cluster) => `<option value="${cluster}">Cluster ${cluster}</option>`).join("");
+
+    function renderTerms() {
+      // Las barras comparan los términos informativos del cluster seleccionado.
+      const cluster = termCluster.value;
+      const terms = clusterTerms[cluster] || [];
+      const maxScore = Math.max(...terms.map((item) => item.score), 0);
+      document.getElementById("term-list").innerHTML = terms.length ? terms.map((item) => {
+        const width = maxScore ? Math.max(2, item.score / maxScore * 100) : 0;
+        return `<div class="term-row"><div class="term-meta"><strong>${escapeHtml(item.term)}</strong><span>${item.prevalence}/${item.total} notas · dif. ${(item.score * 100).toFixed(2)} pp</span></div><div class="term-track"><i style="width:${width}%;background:${colors[cluster]}"></i></div></div>`;
+      }).join("") : '<div class="term-empty">No hay términos distintivos suficientes con el filtro de frecuencia actual.</div>';
+    }
+
+    function queryMatches(point) {
+      // La búsqueda no distingue mayúsculas y consulta tanto título como ID.
+      const query = search.value.trim().toLocaleLowerCase("es");
+      return !query || `${point.title} ${point.file}`.toLocaleLowerCase("es").includes(query);
+    }
+
+    function renderList() {
+      // La lista refleja simultáneamente los clusters habilitados y el texto buscado.
+      const shown = points.filter((point) => enabled.has(String(point.cluster)) && queryMatches(point));
+      document.getElementById("doc-list").innerHTML = shown.map((point) => {
+        const href = `../notas_de_prensa/seleccion_taller/corpus_practica/${encodeURIComponent(point.file)}`;
+        return `<a href="${href}" target="_blank" rel="noreferrer">${escapeHtml(point.title)}<small>Cluster ${point.cluster} · ${escapeHtml(point.file)}</small></a>`;
+      }).join("") || '<div class="side-label" style="padding:12px 4px">No hay notas con ese filtro.</div>';
+    }
+
+    function escapeHtml(value) {
+      // Los títulos y nombres proceden de documentos; se escapan antes de
+      // insertarlos con innerHTML para evitar que se interpreten como marcado.
+      return String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;"}[char]));
+    }
+
+    function draw() {
+      // Ajusta la resolución interna del canvas a la pantalla para evitar que
+      // el gráfico se vea borroso en pantallas de alta densidad.
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      // Convierte las coordenadas UMAP al espacio del canvas y deja margen
+      // para las etiquetas de los ejes.
+      const pad = { left: 54, right: 20, top: 20, bottom: 42 };
+      const xs = points.map((p) => p.x);
+      const ys = points.map((p) => p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const spanX = maxX - minX || 1, spanY = maxY - minY || 1;
+      const px = (value) => pad.left + ((value - minX) / spanX) * (width - pad.left - pad.right);
+      const py = (value) => height - pad.bottom - ((value - minY) / spanY) * (height - pad.top - pad.bottom);
+
+      // Dibuja una cuadrícula con marcas numéricas para facilitar la lectura;
+      // los ejes son coordenadas de la proyección, no categorías del corpus.
+      ctx.font = "11px Arial, sans-serif";
+      ctx.strokeStyle = "#e4eae5";
+      ctx.fillStyle = "#68776f";
+      ctx.lineWidth = 1;
+      for (let tick = 0; tick <= 4; tick += 1) {
+        const x = pad.left + tick * (width - pad.left - pad.right) / 4;
+        const y = pad.top + tick * (height - pad.top - pad.bottom) / 4;
+        ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, height - pad.bottom); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+        ctx.textAlign = "center"; ctx.fillText((minX + tick * spanX / 4).toFixed(1), x, height - 19);
+        ctx.textAlign = "right"; ctx.fillText((maxY - tick * spanY / 4).toFixed(1), pad.left - 9, y + 4);
+      }
+      ctx.fillStyle = "#53645b"; ctx.textAlign = "center"; ctx.fillText("UMAP 1", (pad.left + width - pad.right) / 2, height - 2);
+      ctx.save(); ctx.translate(13, height / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("UMAP 2", 0, 0); ctx.restore();
+
+      // Guarda las posiciones dibujadas para calcular luego cuál punto está
+      // bajo el puntero. Opacidad y tamaño indican filtro y coincidencia.
+      drawn = [];
+      points.forEach((point) => {
+        const active = enabled.has(String(point.cluster));
+        const match = queryMatches(point);
+        const x = px(point.x), y = py(point.y);
+        ctx.beginPath(); ctx.arc(x, y, match && active ? 7 : 6, 0, Math.PI * 2);
+        ctx.fillStyle = colors[String(point.cluster)];
+        ctx.globalAlpha = !active ? 0.08 : (match ? 0.9 : 0.16);
+        ctx.fill();
+        if (match && active) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke(); }
+        drawn.push({ point, x, y, active });
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    // Cada interacción actualiza los paneles relacionados para que filtros,
+    // términos y listado representen siempre la misma selección.
+    document.getElementById("legend").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-cluster]");
+      if (!button) return;
+      const cluster = button.dataset.cluster;
+      if (enabled.has(cluster)) enabled.delete(cluster); else enabled.add(cluster);
+      button.setAttribute("aria-pressed", String(enabled.has(cluster)));
+      termCluster.value = cluster;
+      renderTerms();
+      draw(); renderList();
+    });
+    termCluster.addEventListener("change", renderTerms);
+    search.addEventListener("input", () => { draw(); renderList(); });
+    // Busca el punto activo más cercano al puntero para mostrar su ficha breve.
+    canvas.addEventListener("pointermove", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left, y = event.clientY - rect.top;
+      const nearest = drawn.filter((item) => item.active).map((item) => ({...item, distance: Math.hypot(item.x - x, item.y - y)})).sort((a, b) => a.distance - b.distance)[0];
+      if (!nearest || nearest.distance > 14) { tooltip.style.display = "none"; canvas.style.cursor = "default"; return; }
+      tooltip.innerHTML = `<strong>${escapeHtml(nearest.point.title)}</strong>Cluster ${nearest.point.cluster}<br>${escapeHtml(nearest.point.file)}`;
+      tooltip.style.display = "block";
+      tooltip.style.left = `${Math.min(x + 13, rect.width - 300)}px`;
+      tooltip.style.top = `${Math.max(4, y - 15)}px`;
+      canvas.style.cursor = "pointer";
+    });
+    canvas.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
+    // Redibuja al cambiar el tamaño de la ventana y realiza el primer render.
+    new ResizeObserver(draw).observe(canvas);
+    renderList();
+    renderTerms();
+    draw();
+  </script>
+</body>
+</html>
